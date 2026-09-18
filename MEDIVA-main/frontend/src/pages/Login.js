@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
-import { User, Stethoscope, ArrowRight, Loader2, Mail, KeyRound, Zap } from "lucide-react";
+import { User, Stethoscope, ArrowRight, Loader2, Mail, Lock, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,75 @@ const DEMO = {
   patient: { email: "patient@mediva.ai", password: "password123" },
   doctor: { email: "doctor@mediva.ai", password: "password123" },
 };
+
+const SLIDES = [
+  {
+    image:
+      "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1000&q=80",
+    caption: "Advanced Clinical Intelligence for Modern Care",
+  },
+  {
+    image:
+      "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=1000&q=80",
+    caption: "Seamless Patient & Physician Collaboration",
+  },
+  {
+    image:
+      "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=1000&q=80",
+    caption: "Real-Time Medical Monitoring & Diagnostics",
+  },
+];
+
+function Slideshow() {
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActive((i) => (i + 1) % SLIDES.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div
+      className="relative hidden h-full min-h-[560px] w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-sm lg:block"
+      data-testid="login-slideshow"
+    >
+      {SLIDES.map((slide, i) => (
+        <div
+          key={slide.image}
+          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+            i === active ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          <img
+            src={slide.image}
+            alt={slide.caption}
+            className="h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/85 via-slate-900/20 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 p-8">
+            <p className="text-xl font-semibold text-white">{slide.caption}</p>
+          </div>
+        </div>
+      ))}
+      <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 gap-2">
+        {SLIDES.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => setActive(i)}
+            aria-label={`Go to slide ${i + 1}`}
+            data-testid={`login-slideshow-dot-${i}`}
+            className={`h-2 rounded-full transition-all duration-300 ${
+              i === active ? "w-6 bg-sky-500" : "w-2 bg-white/50 hover:bg-white/70"
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Login() {
   const navigate = useNavigate();
@@ -50,37 +119,41 @@ export default function Login() {
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-md flex-col px-4 py-10 sm:py-14">
-        <div className="mb-6 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Secure sign in</h1>
-          <p className="mt-1 text-sm text-slate-500">Choose your portal to continue</p>
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:py-14 lg:grid-cols-2 lg:items-center lg:gap-12">
+        <Slideshow />
+
+        <div className="mx-auto flex w-full max-w-md flex-col">
+          <div className="mb-6 text-center">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Secure sign in</h1>
+            <p className="mt-1 text-sm text-slate-500">Choose your portal to continue</p>
+          </div>
+
+          <Tabs value={tab} onValueChange={setTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 rounded-xl border border-slate-200 bg-white p-1">
+              <TabsTrigger
+                value="patient"
+                data-testid="tab-patient-portal"
+                className="rounded-lg data-[state=active]:bg-sky-600 data-[state=active]:text-white"
+              >
+                <User className="mr-2 h-4 w-4" /> Patient Portal
+              </TabsTrigger>
+              <TabsTrigger
+                value="doctor"
+                data-testid="tab-doctor-portal"
+                className="rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white"
+              >
+                <Stethoscope className="mr-2 h-4 w-4" /> Doctor / Staff
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="patient" className="mt-5">
+              <PatientPanel navigate={navigate} />
+            </TabsContent>
+            <TabsContent value="doctor" className="mt-5">
+              <DoctorPanel navigate={navigate} />
+            </TabsContent>
+          </Tabs>
         </div>
-
-        <Tabs value={tab} onValueChange={setTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 rounded-xl border border-slate-200 bg-white p-1">
-            <TabsTrigger
-              value="patient"
-              data-testid="tab-patient-portal"
-              className="rounded-lg data-[state=active]:bg-sky-600 data-[state=active]:text-white"
-            >
-              <User className="mr-2 h-4 w-4" /> Patient Portal
-            </TabsTrigger>
-            <TabsTrigger
-              value="doctor"
-              data-testid="tab-doctor-portal"
-              className="rounded-lg data-[state=active]:bg-slate-900 data-[state=active]:text-white"
-            >
-              <Stethoscope className="mr-2 h-4 w-4" /> Doctor / Staff
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="patient" className="mt-5">
-            <PatientPanel navigate={navigate} />
-          </TabsContent>
-          <TabsContent value="doctor" className="mt-5">
-            <DoctorPanel navigate={navigate} />
-          </TabsContent>
-        </Tabs>
       </div>
     </div>
   );
@@ -115,51 +188,46 @@ function DevLoginButton({ onClick, loading, label, testid }) {
 }
 
 function PatientPanel({ navigate }) {
-  const { sendPatientOtp, verifyPatientOtp, devLogin } = useAuth();
-  const [step, setStep] = useState("email");
-  const [email, setEmail] = useState("");
+  const { loginPatient, signupPatient, devLogin } = useAuth();
+  const [mode, setMode] = useState("login"); // login | signup
   const [fullName, setFullName] = useState("");
-  const [code, setCode] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
 
-async function handleSend(e) {
+  async function handlePatientSubmit(e) {
     e.preventDefault();
-    if (!email.trim()) return toast.error("Please enter your email.");
-    setLoading(true);
-    try {
-      await sendPatientOtp(email, { full_name: fullName });
-      navigate("/patient/dashboard");
-    } catch (err) {
-      toast.error(err?.message || "Login failed.");
-    } finally {
-      setLoading(false);
-    }
-  }
+    if (!email.trim() || !password.trim())
+      return toast.error("Please enter your email and password.");
+    if (mode === "signup" && !fullName.trim())
+      return toast.error("Please enter your full name.");
 
-  async function handleVerify(e) {
-    e.preventDefault();
-    if (!code.trim()) return toast.error("Enter the code from your email.");
     setLoading(true);
     try {
-      await verifyPatientOtp(email, code, { full_name: fullName });
-      toast.success("Signed in!");
+      if (mode === "signup") {
+        await signupPatient(email, password, fullName);
+        toast.success("Account created!");
+      } else {
+        await loginPatient(email, password);
+        toast.success("Signed in!");
+      }
       navigate("/patient/dashboard", { replace: true });
     } catch (err) {
-      toast.error(err.message || "Invalid or expired code");
+      toast.error(err?.message || "Authentication failed.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDemo() {
+  async function handleDemoLogin() {
     setDemoLoading(true);
     try {
       await devLogin(DEMO.patient.email, DEMO.patient.password);
       toast.success("Signed in as demo patient");
       navigate("/patient/dashboard", { replace: true });
     } catch (err) {
-      toast.error(err.message || "Demo login unavailable");
+      toast.error(err?.message || "Demo login unavailable");
     } finally {
       setDemoLoading(false);
     }
@@ -167,10 +235,10 @@ async function handleSend(e) {
 
   return (
     <Panel>
-      {step === "email" ? (
-        <form onSubmit={handleSend} className="space-y-4">
+      <form onSubmit={handlePatientSubmit} className="space-y-4">
+        {mode === "signup" && (
           <div className="space-y-1.5">
-            <Label htmlFor="p-name">Full name (new patients)</Label>
+            <Label htmlFor="p-name">Full name</Label>
             <Input
               id="p-name"
               data-testid="patient-fullname"
@@ -180,75 +248,85 @@ async function handleSend(e) {
               className="h-11"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="p-email">Email</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                id="p-email"
-                type="email"
-                data-testid="patient-otp-email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@email.com"
-                className="h-11 pl-9"
-              />
-            </div>
-            <p className="text-xs text-slate-400">
-              We'll email you a one-time verification code.
-            </p>
+        )}
+        <div className="space-y-1.5">
+          <Label htmlFor="p-email">Email</Label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              id="p-email"
+              type="email"
+              data-testid="patient-email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@email.com"
+              className="h-11 pl-9"
+            />
           </div>
-          <Button
-            type="submit"
-            disabled={loading}
-            data-testid="patient-send-otp"
-            className="h-11 w-full bg-sky-600 hover:bg-sky-700"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Verification Code"}
-          </Button>
-          <DevLoginButton
-            onClick={handleDemo}
-            loading={demoLoading}
-            label="Continue as Demo Patient"
-            testid="patient-demo-login"
-          />
-        </form>
-      ) : (
-        <form onSubmit={handleVerify} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="p-code">Enter the 6-digit code</Label>
-            <div className="relative">
-              <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                id="p-code"
-                inputMode="numeric"
-                maxLength={6}
-                data-testid="patient-otp-code"
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="••••••"
-                className="h-11 pl-9 tracking-[0.5em]"
-              />
-            </div>
-            <p className="text-xs text-slate-400">Sent to {email}</p>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="p-password">Password</Label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              id="p-password"
+              type="password"
+              data-testid="patient-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="h-11 pl-9"
+            />
           </div>
-          <Button
-            type="submit"
-            disabled={loading}
-            data-testid="patient-verify-otp"
-            className="h-11 w-full bg-sky-600 hover:bg-sky-700"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & Continue"}
-          </Button>
-          <button
-            type="button"
-            onClick={() => setStep("email")}
-            className="w-full text-center text-sm font-medium text-sky-600 hover:underline"
-          >
-            Use a different email
-          </button>
-        </form>
-      )}
+        </div>
+        <Button
+          type="submit"
+          disabled={loading}
+          data-testid="patient-submit"
+          className="h-11 w-full bg-sky-600 hover:bg-sky-700"
+        >
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : mode === "signup" ? (
+            "Create Account"
+          ) : (
+            "Sign In"
+          )}
+        </Button>
+        <p className="text-center text-sm text-slate-500">
+          {mode === "signup" ? (
+            <>
+              Already have an account?{" "}
+              <button
+                type="button"
+                onClick={() => setMode("login")}
+                className="font-medium text-sky-600 hover:underline"
+                data-testid="patient-switch-login"
+              >
+                Sign in
+              </button>
+            </>
+          ) : (
+            <>
+              New patient?{" "}
+              <button
+                type="button"
+                onClick={() => setMode("signup")}
+                className="font-medium text-sky-600 hover:underline"
+                data-testid="patient-switch-signup"
+              >
+                Create account
+              </button>
+            </>
+          )}
+        </p>
+        <DevLoginButton
+          onClick={handleDemoLogin}
+          loading={demoLoading}
+          label="Continue as Demo Patient"
+          testid="patient-demo-login"
+        />
+      </form>
     </Panel>
   );
 }

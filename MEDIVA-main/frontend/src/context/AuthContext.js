@@ -17,14 +17,19 @@ export function AuthProvider({ children }) {
     mounted.current = true;
 
     (async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session) {
-        const p = await getMyProfile();
-        if (mounted.current && p) setUser(p);
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session) {
+          const p = await getMyProfile();
+          if (mounted.current && p) setUser(p);
+        }
+      } catch (err) {
+        console.error("Failed to restore session:", err);
+      } finally {
+        if (mounted.current) setReady(true);
       }
-      if (mounted.current) setReady(true);
     })();
 
     const {
@@ -35,9 +40,13 @@ export function AuthProvider({ children }) {
         return;
       }
       if (session) {
-        const p = await getMyProfile();
-        // Only set when a profile is found; never clobber an active user with null
-        if (mounted.current && p) setUser(p);
+        try {
+          const p = await getMyProfile();
+          // Only set when a profile is found; never clobber an active user with null
+          if (mounted.current && p) setUser(p);
+        } catch (err) {
+          console.error("Failed to load profile on auth state change:", err);
+        }
       }
     });
 
@@ -47,120 +56,156 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-
-// ----- Patient: direct sign-in bypass (no OTP needed) -----
-  async function sendPatientOtp(email, extra = {}) {
-    const cleanEmail = (email || "").trim();
-    const demoPassword = "MedivaPatient2026!";
-
-    // 1. Try to log in with preset password
-    let { error } = await supabase.auth.signInWithPassword({
-      email: cleanEmail,
-      password: demoPassword,
-    });
-
-    // 2. If the user doesn't exist, create the account
-    if (error) {
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password: demoPassword,
+  // ----- Patient: email + password -----
+  async function loginPatient(email, password) {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: (email || "").trim(),
+        password,
       });
-      if (signUpError) throw signUpError;
-    }
+      if (error) throw new Error(mapAuthError(error));
 
-    // 3. Attach patient profile and set session state
-    const profile = await ensurePatientProfile(extra);
-    setUser(profile);
-    return profile;
+      const profile = await getMyProfile();
+      if (!profile) throw new Error("No patient profile found for this account.");
+      setUser(profile);
+      return profile;
+    } catch (err) {
+      throw err instanceof Error ? err : new Error(mapAuthError(err));
+    } finally {
+      // Ensures this promise always settles so callers never hang on a stuck spinner.
+    }
   }
 
-  async function verifyPatientOtp(email, token, extra = {}) {
-    const { error } = await supabase.auth.verifyOtp({
-      email: (email || "").trim(),
-      token: (token || "").trim(),
-      type: "email",
-    });
-    if (error) throw error;
-    const profile = await ensurePatientProfile(extra);
-    setUser(profile);
-    return profile;
+  async function signupPatient(email, password, fullName) {
+    try {
+      const cleanEmail = (email || "").trim();
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+      });
+      if (error) throw new Error(mapAuthError(error));
+
+      if (!data.session) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+        if (signInError) throw new Error(mapAuthError(signInError));
+      }
+
+      const profile = await ensurePatientProfile({ full_name: fullName, role: "patient" });
+      setUser(profile);
+      return profile;
+    } catch (err) {
+      throw err instanceof Error ? err : new Error(mapAuthError(err));
+    } finally {
+      // Ensures this promise always settles so callers never hang on a stuck spinner.
+    }
   }
 
   // ----- Doctor: email + password -----
   async function loginDoctor(email, password) {
-    const { error } = await supabase.auth.signInWithPassword({
-      email: (email || "").trim(),
-      password,
-    });
-    if (error) throw new Error(mapAuthError(error));
-    const profile = await getMyProfile();
-    if (!profile || profile.role !== "doctor") {
-      await supabase.auth.signOut();
-      throw new Error("This account is not registered as clinical staff.");
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: (email || "").trim(),
+        password,
+      });
+      if (error) throw new Error(mapAuthError(error));
+
+      const profile = await getMyProfile();
+      if (!profile || profile.role !== "doctor") {
+        await supabase.auth.signOut();
+        throw new Error("This account is not registered as clinical staff.");
+      }
+      setUser(profile);
+      return profile;
+    } catch (err) {
+      throw err instanceof Error ? err : new Error(mapAuthError(err));
+    } finally {
+      // Ensures this promise always settles so callers never hang on a stuck spinner.
     }
-    setUser(profile);
-    return profile;
   }
 
-async function signupDoctor(profileData, password) {
-    const cleanEmail = (profileData.email || "").trim();
-    const { data, error } = await supabase.auth.signUp({
-      email: cleanEmail,
-      password,
-    });
-    if (error) throw new Error(mapAuthError(error));
-
-    if (!data.session) {
-      await supabase.auth.signInWithPassword({
+  async function signupDoctor(profileData, password) {
+    try {
+      const cleanEmail = (profileData.email || "").trim();
+      const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
         password,
       });
-    }
+      if (error) throw new Error(mapAuthError(error));
 
-    const profile = await createDoctorProfileForSession(profileData);
-    setUser(profile);
-    return profile;
+      if (!data.session) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+        if (signInError) throw new Error(mapAuthError(signInError));
+      }
+
+      const profile = await createDoctorProfileForSession(profileData);
+      setUser(profile);
+      return profile;
+    } catch (err) {
+      throw err instanceof Error ? err : new Error(mapAuthError(err));
+    } finally {
+      // Ensures this promise always settles so callers never hang on a stuck spinner.
+    }
   }
 
   // ----- Dev/demo bypass: auto-provision demo accounts -----
   async function devLogin(email, password) {
     const cleanEmail = (email || "").trim();
-    let { error } = await supabase.auth.signInWithPassword({
-      email: cleanEmail,
-      password,
-    });
-
-    // If the account does not exist yet, create it immediately
-    if (error) {
-      const { error: signUpError } = await supabase.auth.signUp({
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password,
       });
-      if (signUpError) throw new Error(mapAuthError(signUpError));
-    }
 
-    let profile = await getMyProfile();
-    if (!profile) {
-      if (cleanEmail.toLowerCase().includes("doctor")) {
-        profile = await createDoctorProfileForSession({
-          full_name: "Dr. Demo",
-          specialty: "Clinical Specialist",
+      if (signInError) {
+        // The account may not exist yet, so attempt to provision it. If it turns out
+        // the account already exists (422), surface a clear message instead of
+        // bouncing between signIn/signUp with the same stale credentials.
+        const { error: signUpError } = await supabase.auth.signUp({
           email: cleanEmail,
+          password,
         });
-      } else {
-        profile = await ensurePatientProfile({
-          full_name: "Demo Patient",
-        });
+        if (signUpError) {
+          if (/already registered|already exists/i.test(signUpError.message || "")) {
+            throw new Error(
+              "This demo account already exists with different credentials. Please contact support to reset it."
+            );
+          }
+          throw new Error(mapAuthError(signUpError));
+        }
       }
-    }
 
-    setUser(profile);
-    return profile;
+      let profile = await getMyProfile();
+      if (!profile) {
+        profile = cleanEmail.toLowerCase().includes("doctor")
+          ? await createDoctorProfileForSession({
+              full_name: "Dr. Demo",
+              specialty: "Clinical Specialist",
+              email: cleanEmail,
+            })
+          : await ensurePatientProfile({ full_name: "Demo Patient" });
+      }
+
+      setUser(profile);
+      return profile;
+    } catch (err) {
+      throw err instanceof Error ? err : new Error(mapAuthError(err));
+    } finally {
+      // Ensures this promise always settles so callers never hang on a stuck spinner.
+    }
   }
 
   async function logout() {
-    await supabase.auth.signOut();
-    setUser(null);
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      setUser(null);
+    }
   }
 
   return (
@@ -168,8 +213,8 @@ async function signupDoctor(profileData, password) {
       value={{
         user,
         ready,
-        sendPatientOtp,
-        verifyPatientOtp,
+        loginPatient,
+        signupPatient,
         loginDoctor,
         signupDoctor,
         devLogin,
