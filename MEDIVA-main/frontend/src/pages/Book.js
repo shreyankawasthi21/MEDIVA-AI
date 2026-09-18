@@ -11,8 +11,6 @@ import {
   Loader2,
   CheckCircle2,
   CalendarClock,
-  KeyRound,
-  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +24,7 @@ import { initials } from "@/lib/format";
 
 export default function Book() {
   const navigate = useNavigate();
-  const { user, sendPatientOtp, verifyPatientOtp } = useAuth();
+  const { user, signupPatient } = useAuth();
 
   const [specialties, setSpecialties] = useState([]);
   const [doctorCache, setDoctorCache] = useState({});
@@ -38,8 +36,6 @@ export default function Book() {
   });
   const [when, setWhen] = useState(dayjs().add(1, "day").hour(10).minute(0).format("YYYY-MM-DDTHH:mm"));
   const [paying, setPaying] = useState(false);
-  const [phase, setPhase] = useState("form"); // form | otp
-  const [code, setCode] = useState("");
 
   // Prefill when the visitor is already an authenticated patient
   useEffect(() => {
@@ -115,28 +111,12 @@ export default function Book() {
         await doBooking(user);
         return;
       }
-      // Not authenticated: verify email via OTP to secure the booking
-      await sendPatientOtp(form.email);
-      toast.success("Verification code sent to your email");
-      setPhase("otp");
-    } catch (err) {
-      toast.error(err.message || "Booking failed. Please try again.");
-    } finally {
-      setPaying(false);
-    }
-  }
-
-  async function handleVerifyAndBook() {
-    if (!code.trim()) return toast.error("Enter the code from your email.");
-    setPaying(true);
-    try {
-      const profile = await verifyPatientOtp(form.email, code, {
-        full_name: form.full_name,
-        phone_number: form.phone_number,
-      });
+      // Not authenticated: provision a patient account for this booking
+      const guestPassword = `${Math.random().toString(36).slice(2)}Aa1!`;
+      const profile = await signupPatient(form.email, guestPassword, form.full_name);
       await doBooking(profile);
     } catch (err) {
-      toast.error(err.message || "Verification failed. Try again.");
+      toast.error(err.message || "Booking failed. Please try again.");
     } finally {
       setPaying(false);
     }
@@ -310,82 +290,36 @@ export default function Book() {
 
               {/* Payment / verification */}
               <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                {phase === "form" ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">Advance Booking Fee</span>
-                      <span className="flex items-center text-lg font-semibold text-slate-900">
-                        <IndianRupee className="h-4 w-4" />
-                        {advanceFee}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-400">
-                      Reserves your slot. Balance ₹{consultFee - advanceFee} due at the clinic.
-                    </p>
-                    <Button
-                      onClick={handlePayAndBook}
-                      disabled={!canBook || paying}
-                      data-testid="book-pay-confirm"
-                      className="mt-4 h-11 w-full bg-sky-600 hover:bg-sky-700"
-                    >
-                      {paying ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" /> Processing…
-                        </>
-                      ) : (
-                        <>
-                          <ShieldCheck className="h-4 w-4" /> Pay Advance Fee &amp; Confirm
-                        </>
-                      )}
-                    </Button>
-                    <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                      {user ? "Signed in — secure checkout" : "Secure checkout · email verification"}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2 text-sky-700">
-                      <Mail className="h-4 w-4" />
-                      <span className="text-sm font-semibold">Verify your email</span>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      We sent a 6-digit code to <span className="font-medium">{form.email}</span> to
-                      confirm your booking.
-                    </p>
-                    <div className="relative mt-3">
-                      <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        inputMode="numeric"
-                        maxLength={6}
-                        data-testid="book-otp-code"
-                        value={code}
-                        onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                        placeholder="••••••"
-                        className="h-11 pl-9 tracking-[0.5em]"
-                      />
-                    </div>
-                    <Button
-                      onClick={handleVerifyAndBook}
-                      disabled={paying}
-                      data-testid="book-verify-confirm"
-                      className="mt-3 h-11 w-full bg-sky-600 hover:bg-sky-700"
-                    >
-                      {paying ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        "Verify & Confirm Booking"
-                      )}
-                    </Button>
-                    <button
-                      type="button"
-                      onClick={() => setPhase("form")}
-                      className="mt-2 w-full text-center text-xs font-medium text-sky-600 hover:underline"
-                    >
-                      Back
-                    </button>
-                  </>
-                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">Advance Booking Fee</span>
+                  <span className="flex items-center text-lg font-semibold text-slate-900">
+                    <IndianRupee className="h-4 w-4" />
+                    {advanceFee}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-400">
+                  Reserves your slot. Balance ₹{consultFee - advanceFee} due at the clinic.
+                </p>
+                <Button
+                  onClick={handlePayAndBook}
+                  disabled={!canBook || paying}
+                  data-testid="book-pay-confirm"
+                  className="mt-4 h-11 w-full bg-sky-600 hover:bg-sky-700"
+                >
+                  {paying ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Processing…
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-4 w-4" /> Pay Advance Fee &amp; Confirm
+                    </>
+                  )}
+                </Button>
+                <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                  {user ? "Signed in — secure checkout" : "Secure checkout"}
+                </div>
               </div>
 
               <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-500">
